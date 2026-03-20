@@ -433,7 +433,7 @@ def build_excel(data):
 
 @app.route("/")
 def index():
-    return send_file("static/index.html")
+    return app.send_static_file("index.html")
 
 
 @app.route("/api/generate", methods=["POST"])
