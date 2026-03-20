@@ -5,6 +5,7 @@ Flask backend: scraping, scoring, Excel generation
 """
 
 import os, re, json, time, random, hashlib
+from urllib.parse import quote
 from datetime import datetime, timedelta
 from io import BytesIO
 from flask import Flask, jsonify, send_file, render_template, request
@@ -268,7 +269,7 @@ def _get_curated_articles(date_str):
                 "title": title,
                 "summary": summary,
                 "pub_time": pub.strftime("%Y-%m-%d %H:%M"),
-                "url": f"https://mp.weixin.qq.com/s/{hashlib.md5((title+date_str).encode()).hexdigest()[:16]}",
+                "url": f"https://weixin.sogou.com/weixin?type=2&query={quote(account + ' ' + title)}",
             })
 
     return articles
