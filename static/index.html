@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>热榜 · TOP50 公众号热点文章</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --ink: #0D1117;
+  --paper: #F6F4F0;
+  --cream: #FFFDF7;
+  --navy: #1B2A4A;
+  --gold: #C8A951;
+  --gold-light: #F5E6B8;
+  --rust: #B8432F;
+  --teal: #2A7B6E;
+  --mist: #E8E4DD;
+  --slate: #6B7280;
+  --border: #D4CFC6;
+  --shadow: rgba(13, 17, 23, 0.08);
+}
+
+html { font-size: 16px; scroll-behavior: smooth; }
+
+body {
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Grain Overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Header ── */
+.masthead {
+  background: var(--navy);
+  color: var(--cream);
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.masthead::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--rust) 50%, var(--gold) 100%);
+}
+
+.masthead-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 2.5rem 1.8rem;
+}
+
+.masthead-top {
+  display: flex;
+  align-items: baseline;
+  gap: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.masthead h1 {
+  font-family: 'Noto Serif SC', serif;
+  font-weight: 900;
+  font-size: 2.2rem;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.masthead h1 .accent {
+  color: var(--gold);
+  font-size: 2.6rem;
+}
+
+.edition-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid rgba(200, 169, 81, 0.4);
+  padding: 0.15rem 0.6rem;
+  border-radius: 2px;
+}
+
+.masthead-sub {
+  font-size: 0.85rem;
+  color: rgba(255,253,247,0.5);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+}
+
+/* ── Landing / Hero ── */
+.hero {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 4rem 2.5rem;
+  text-align: center;
+  min-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 2rem;
+  box-shadow: 0 8px 32px rgba(27, 42, 74, 0.15);
+}
+
+.hero-icon svg {
+  width: 36px;
+  height: 36px;
+  fill: var(--gold);
+}
+
+.hero h2 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 0.8rem;
+}
+
+.hero p {
+  font-size: 1rem;
+  color: var(--slate);
+  max-width: 520px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.7;
+}
+
+.btn-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--navy);
+  color: var(--cream);
+  border: none;
+  padding: 0.95rem 2.4rem;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-generate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--gold) 0%, var(--rust) 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.btn-generate:hover::before { opacity: 1; }
+.btn-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(27,42,74,0.2); }
+.btn-generate span, .btn-generate svg { position: relative; z-index: 1; }
+.btn-generate svg { width: 18px; height: 18px; fill: currentColor; }
+.btn-generate:disabled { opacity: 0.6; cursor: wait; transform: none !important; }
+
+/* ── Loading ── */
+.loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(246, 244, 240, 0.92);
+  backdrop-filter: blur(8px);
+  z-index: 1000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-overlay.active { display: flex; }
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--mist);
+  border-top-color: var(--navy);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-text {
+  margin-top: 1.5rem;
+  font-family: 'Noto Serif SC', serif;
+  font-size: 1.1rem;
+  color: var(--navy);
+}
+
+.loading-sub {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--slate);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Results Container ── */
+.results { display: none; }
+.results.active { display: block; }
+
+/* ── Stats Bar ── */
+.stats-bar {
+  background: var(--cream);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 0;
+}
+
+.stats-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.stats-left {
+  display: flex;
+  align-items: center;
+  gap: 1.8rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.stat-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--slate);
+  letter-spacing: 0.04em;
+}
+
+.stats-right {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--teal);
+  color: white;
+  border: none;
+  padding: 0.55rem 1.4rem;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.03em;
+}
+
+.btn-download:hover { background: #236B5F; transform: translateY(-1px); }
+.btn-download svg { width: 15px; height: 15px; fill: currentColor; }
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  color: var(--slate);
+  border: 1px solid var(--border);
+  padding: 0.55rem 1.2rem;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-refresh:hover { border-color: var(--navy); color: var(--navy); }
+.btn-refresh svg { width: 14px; height: 14px; fill: currentColor; }
+
+.gen-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--slate);
+  align-self: center;
+}
+
+/* ── Table ── */
+.table-wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem 2.5rem 4rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--cream);
+  box-shadow: 0 1px 3px var(--shadow), 0 8px 24px var(--shadow);
+}
+
+.data-table thead th {
+  background: var(--navy);
+  color: var(--cream);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.data-table thead th:first-child { text-align: center; width: 50px; }
+.data-table thead th:nth-child(7),
+.data-table thead th:nth-child(8),
+.data-table thead th:nth-child(9) { text-align: center; }
+
+.data-table tbody tr {
+  transition: background 0.15s;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(200, 169, 81, 0.08) !important;
+}
+
+.data-table tbody td {
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+/* Rank column */
+.rank-cell {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--slate);
+}
+
+.rank-gold .rank-cell {
+  color: var(--gold);
+  font-size: 1.1rem;
+}
+
+.rank-gold {
+  background: linear-gradient(135deg, #FFFDF7 0%, #FFF8E1 100%) !important;
+}
+
+.rank-gold td:first-child {
+  position: relative;
+}
+
+.rank-gold td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gold);
+}
+
+/* Account name */
+.account-name {
+  font-weight: 500;
+  color: var(--navy);
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+/* Title */
+.article-title {
+  font-family: 'Noto Serif SC', serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.article-title a {
+  color: var(--ink);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.article-title a:hover { color: var(--rust); }
+
+/* Summary */
+.article-summary {
+  font-size: 0.8rem;
+  color: var(--slate);
+  line-height: 1.6;
+  max-width: 380px;
+}
+
+/* Time */
+.pub-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+/* Score cells */
+.score-cell {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.match-badge {
+  display: inline-block;
+  background: var(--navy);
+  color: var(--cream);
+  padding: 0.1rem 0.5rem;
+  border-radius: 2px;
+  font-size: 0.75rem;
+  min-width: 24px;
+  text-align: center;
+}
+
+.match-badge.high { background: var(--rust); }
+.match-badge.mid { background: var(--teal); }
+
+.total-score {
+  color: var(--navy);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.rank-gold .total-score { color: var(--gold); }
+
+/* Alternating rows */
+.data-table tbody tr:nth-child(even):not(.rank-gold) {
+  background: rgba(0,0,0,0.015);
+}
+
+/* ── Footer ── */
+.foot {
+  text-align: center;
+  padding: 2rem;
+  font-size: 0.72rem;
+  color: var(--slate);
+  border-top: 1px solid var(--border);
+  max-width: 1400px;
+  margin: 0 auto;
+  letter-spacing: 0.04em;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .table-wrap { padding: 1rem; overflow-x: auto; }
+  .data-table { min-width: 900px; }
+  .stats-inner { padding: 0 1rem; }
+  .masthead-inner { padding: 1.5rem 1rem 1.2rem; }
+}
+
+@media (max-width: 640px) {
+  .masthead h1 { font-size: 1.5rem; }
+  .masthead h1 .accent { font-size: 1.8rem; }
+  .hero { padding: 3rem 1.5rem; }
+  .hero h2 { font-size: 1.3rem; }
+  .stats-left { gap: 1rem; }
+  .stat-num { font-size: 1.1rem; }
+  .stats-right { flex-direction: column; }
+}
+
+/* ── Entrance Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.results.active .stats-bar { animation: fadeUp 0.5s ease both; }
+.results.active .table-wrap { animation: fadeUp 0.6s 0.15s ease both; }
+
+.data-table tbody tr {
+  animation: fadeUp 0.4s ease both;
+}
+
+/* stagger via JS */
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="masthead-top">
+      <h1>热榜<span class="accent">·</span>TOP50</h1>
+      <span class="edition-tag">DAILY BRIEF</span>
+    </div>
+    <p class="masthead-sub">公众号热点文章智能追踪 — 微博热搜 × AI评分 × 时效权重</p>
+  </div>
+</header>
+
+<!-- Hero / Landing -->
+<section class="hero" id="heroSection">
+  <div class="hero-icon">
+    <svg viewBox="0 0 24 24"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1h2a2 2 0 012 2v9a2 2 0 01-2 2zM5 6v12h14V9h-4V6H5zm14 5h-2v2h2v-2zm0 4h-2v2h2v-2zM7 8h4v2H7V8zm0 4h6v2H7v-2zm0 4h6v2H7v-2z"/></svg>
+  </div>
+  <h2>一键生成今日热点清单</h2>
+  <p>自动抓取微博热搜与22个头部公众号最新文章，<br>经 AI 评分与热度算法排序，输出 TOP 50 精选。</p>
+  <button class="btn-generate" id="btnGenerate" onclick="generate()">
+    <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    <span>生成今日 TOP50</span>
+  </button>
+</section>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-spinner"></div>
+  <p class="loading-text" id="loadingText">正在抓取热点数据…</p>
+  <p class="loading-sub" id="loadingSub">SCRAPING WEIBO + 22 ACCOUNTS</p>
+</div>
+
+<!-- Results -->
+<section class="results" id="results">
+  <div class="stats-bar">
+    <div class="stats-inner">
+      <div class="stats-left">
+        <div class="stat-item">
+          <span class="stat-num" id="statArticles">—</span>
+          <span class="stat-label">篇文章</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" id="statKeywords">—</span>
+          <span class="stat-label">热词</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num" id="statAccounts">—</span>
+          <span class="stat-label">公众号</span>
+        </div>
+        <span class="gen-time" id="genTime"></span>
+      </div>
+      <div class="stats-right">
+        <button class="btn-download" onclick="downloadExcel()">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+          <span>下载 Excel</span>
+        </button>
+        <button class="btn-refresh" onclick="generate()">
+          <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.96 7.96 0 0012 4a8 8 0 108 8h-2a6 6 0 11-1.76-4.24L14 10h6V4l-2.35 2.35z"/></svg>
+          <span>刷新</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>公众号</th>
+          <th>文章标题</th>
+          <th>摘要</th>
+          <th>发布时间</th>
+          <th>匹配词数</th>
+          <th>AI评分</th>
+          <th>总分</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    数据来源：微博热搜 · 22个头部微信公众号 &nbsp;|&nbsp; 评分算法：热点匹配 × 1.5 + AI评分 + 时效权重 &nbsp;|&nbsp; 每次点击实时生成
+  </div>
+</section>
+
+<script>
+const loadingMessages = [
+  ["正在抓取微博热搜…", "FETCHING WEIBO HOT SEARCH"],
+  ["正在检索公众号文章…", "SCANNING 22 ACCOUNTS"],
+  ["正在进行关键词匹配…", "KEYWORD MATCHING"],
+  ["AI 正在评分…", "AI SCORING IN PROGRESS"],
+  ["生成排行榜…", "RANKING & SORTING"],
+];
+
+let msgIdx = 0;
+let msgTimer = null;
+
+function showLoading() {
+  document.getElementById("loading").classList.add("active");
+  msgIdx = 0;
+  updateLoadingMsg();
+  msgTimer = setInterval(() => {
+    msgIdx = (msgIdx + 1) % loadingMessages.length;
+    updateLoadingMsg();
+  }, 1800);
+}
+
+function updateLoadingMsg() {
+  document.getElementById("loadingText").textContent = loadingMessages[msgIdx][0];
+  document.getElementById("loadingSub").textContent = loadingMessages[msgIdx][1];
+}
+
+function hideLoading() {
+  document.getElementById("loading").classList.remove("active");
+  if (msgTimer) clearInterval(msgTimer);
+}
+
+async function generate() {
+  const btn = document.getElementById("btnGenerate");
+  btn.disabled = true;
+  showLoading();
+
+  try {
+    const resp = await fetch("/api/generate", { method: "POST" });
+    const data = await resp.json();
+    renderResults(data);
+  } catch (err) {
+    alert("生成失败，请重试: " + err.message);
+  } finally {
+    hideLoading();
+    btn.disabled = false;
+  }
+}
+
+function renderResults(data) {
+  document.getElementById("heroSection").style.display = "none";
+  document.getElementById("results").classList.add("active");
+
+  // Stats
+  document.getElementById("statArticles").textContent = data.stats.total_scraped;
+  document.getElementById("statKeywords").textContent = data.stats.keyword_count;
+  document.getElementById("statAccounts").textContent = data.stats.accounts_covered;
+  document.getElementById("genTime").textContent = data.stats.generated_at;
+
+  // Table
+  const tbody = document.getElementById("tableBody");
+  tbody.innerHTML = "";
+
+  data.articles.forEach((art, i) => {
+    const rank = i + 1;
+    const tr = document.createElement("tr");
+    if (rank <= 3) tr.classList.add("rank-gold");
+    tr.style.animationDelay = `${i * 0.03}s`;
+
+    const matchClass = art.match_count >= 5 ? "high" : art.match_count >= 3 ? "mid" : "";
+
+    tr.innerHTML = `
+      <td class="rank-cell">${rank}</td>
+      <td class="account-name">${esc(art.account)}</td>
+      <td class="article-title"><a href="${esc(art.url)}" target="_blank" rel="noopener">${esc(art.title)}</a></td>
+      <td class="article-summary">${esc(art.summary)}</td>
+      <td class="pub-time">${esc(art.pub_time)}</td>
+      <td class="score-cell"><span class="match-badge ${matchClass}">${art.match_count}</span></td>
+      <td class="score-cell">${art.ai_score}</td>
+      <td class="score-cell total-score">${art.total_score}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s || "";
+  return d.innerHTML;
+}
+
+function downloadExcel() {
+  window.location.href = "/api/download";
+}
+</script>
+</body>
+</html>
