@@ -365,7 +365,7 @@ def _fetch_articles_for_fakeid(account, fakeid, headers, cutoff):
 
                 pub_dt = datetime.fromtimestamp(create_time) if create_time else now
 
-                # 严格48小时过滤
+                # 严格72小时过滤
                 if pub_dt < cutoff:
                     continue
 
@@ -378,7 +378,7 @@ def _fetch_articles_for_fakeid(account, fakeid, headers, cutoff):
                     "_source": "mp_api",
                 })
 
-            print(f"[MP API] {account} page {page}: {len(app_msg_list)} items, {len(articles)} within 48h")
+            print(f"[MP API] {account} page {page}: {len(app_msg_list)} items, {len(articles)} within 72h")
 
         except requests.exceptions.RequestException as e:
             print(f"[MP API] network error '{account}': {e}")
@@ -406,7 +406,7 @@ def _scrape_mp_api():
 
     articles = []
     now = datetime.now()
-    cutoff = now - timedelta(hours=48)
+    cutoff = now - timedelta(hours=72)
     headers = _mp_headers()
     searched_count = 0
 
@@ -790,7 +790,7 @@ def search_articles_bulk():
     all_articles = []
     existing_titles = set()
     now = datetime.now()
-    cutoff = now - timedelta(hours=48)
+    cutoff = now - timedelta(hours=72)
 
     def add_unique(articles_list):
         for art in articles_list:
@@ -850,17 +850,20 @@ def search_articles_bulk():
         pass
     print(f"[Pipeline] After known sites: {len(all_articles)} articles")
 
-    # STRICT 48-hour freshness filter
+    # STRICT 72-hour freshness filter
     filtered = []
     for art in all_articles:
         pub_dt = art.get("_pub_dt")
-        if pub_dt and pub_dt < cutoff:
-            continue  # Discard articles older than 48 hours
+        # 没有可验证的发布时间 → 丢弃（防止过期文章混入）
+        if not pub_dt:
+            continue
+        if pub_dt < cutoff:
+            continue  # Discard articles older than 72 hours
         filtered.append(art)
         # Remove internal field
         art.pop("_pub_dt", None)
 
-    print(f"[Pipeline] After 48h filter: {len(filtered)} articles (from {len(all_articles)})")
+    print(f"[Pipeline] After 72h filter: {len(filtered)} articles (from {len(all_articles)})")
     return filtered
 
 
@@ -920,6 +923,18 @@ def verify_article_source(article):
     if any(sp in title for sp in spam_patterns):
         return False
 
+    # 排除每日资讯合集/汇总类文章（低原创价值）
+    roundup_patterns = [
+        "每日资讯", "日报", "周报", "早报", "晚报", "资讯合集",
+        "一周回顾", "本周盘点", "今日头条汇总", "热点速递",
+        "AI资讯", "科技资讯", "财经资讯", "每日精选",
+        "Top 榜", "TOP榜", "雷达 Top", "资讯雷达",
+        "一文速览", "快讯合集", "要闻速递", "每周精选",
+        "Morning Brief", "Daily Brief", "Weekly Digest",
+    ]
+    if any(rp in title for rp in roundup_patterns):
+        return False
+
     return True
 
 
@@ -966,6 +981,7 @@ def time_weight(pub_time_str):
     elif hours <= 12: return 2.5
     elif hours <= 24: return 2.0
     elif hours <= 48: return 1.5
+    elif hours <= 72: return 1.0
     else: return 0.5
 
 
