@@ -4,7 +4,7 @@ TOP50 Hot Articles Web Application
 Flask backend: scraping, scoring, Excel generation
 """
 
-import os, re, json, time, random
+import os, re, json, time, random, threading
 from datetime import datetime, timedelta
 from io import BytesIO
 from flask import Flask, jsonify, send_file, render_template, request
@@ -971,6 +971,7 @@ def time_weight(pub_time_str):
 def generate_top50():
     """Full pipeline: scrape -> match -> score -> verify -> balanced rank"""
     # Step 1: Keywords by domain
+    _task["progress"] = "正在抓取微博热搜..."
     domain_keywords = scrape_weibo_hot()
     flat_keywords = []
     for kws in domain_keywords.values():
@@ -978,10 +979,12 @@ def generate_top50():
     kw_count = len(flat_keywords)
 
     # Step 2: Articles
+    _task["progress"] = "正在检索公众号文章..."
     articles = search_articles_bulk()
     total_scraped = len(articles)
 
     # Step 3: Match keywords & assign domain
+    _task["progress"] = f"正在匹配关键词...（{len(articles)}篇文章）"
     for art in articles:
         matched_list, primary_domain, primary_keyword = match_keywords_with_domain(art, domain_keywords)
         art["matched_keywords"] = [m["keyword"] for m in matched_list]
@@ -991,6 +994,7 @@ def generate_top50():
         art["primary_keyword"] = primary_keyword
 
     # Step 4: Score
+    _task["progress"] = "AI 评分中..."
     for art in articles:
         art["ai_score"] = ai_score(art)
         art["time_weight"] = time_weight(art["pub_time"])
@@ -1003,6 +1007,7 @@ def generate_top50():
     print(f"[Pipeline] Verified: {len(verified)} / {len(articles)} articles")
 
     # Step 6: Domain-balanced selection (每领域 ~10 篇，总计 50)
+    _task["progress"] = "生成排行榜..."
     per_domain = 10
     domain_buckets = {d: [] for d in DOMAIN_NAMES}
     for art in verified:
@@ -1114,6 +1119,28 @@ def build_excel(data):
     return buf
 
 
+# ── Async Task State ───────────────────────────────────────
+_task = {"running": False, "progress": "", "error": None}
+
+
+def _run_generate():
+    """Background thread: run the full pipeline"""
+    try:
+        _task["progress"] = "正在抓取微博热搜..."
+        data = generate_top50()
+        _cache["data"] = data
+        _cache["time"] = time.time()
+        _cache["excel"] = build_excel(data)
+        _task["progress"] = "完成"
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        _task["error"] = str(e)
+        _task["progress"] = "出错"
+    finally:
+        _task["running"] = False
+
+
 # ── Routes ─────────────────────────────────────────────────
 
 @app.route("/")
@@ -1123,24 +1150,36 @@ def index():
 
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
-    now = time.time()
-    if _cache["data"] and _cache["time"] and (now - _cache["time"] < CACHE_TTL):
-        return jsonify(_cache["data"])
+    """Start generation in background thread, return immediately"""
+    if _task["running"]:
+        return jsonify({"status": "running", "progress": _task["progress"]})
 
-    try:
-        data = generate_top50()
-        _cache["data"] = data
-        _cache["time"] = now
-        _cache["excel"] = build_excel(data)
-        return jsonify(data)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e), "articles": [], "stats": {
-            "total_scraped": 0, "keyword_count": 0, "top50_count": 0,
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "accounts_covered": 0, "domain_distribution": {},
-        }}), 500
+    _task["running"] = True
+    _task["error"] = None
+    _task["progress"] = "启动中..."
+    t = threading.Thread(target=_run_generate, daemon=True)
+    t.start()
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/status")
+def api_status():
+    """Poll this endpoint to check if generation is done"""
+    if _task["running"]:
+        return jsonify({"status": "running", "progress": _task["progress"]})
+
+    if _task["error"]:
+        return jsonify({"status": "error", "error": _task["error"],
+                        "articles": [], "stats": {
+                            "total_scraped": 0, "keyword_count": 0, "top50_count": 0,
+                            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "accounts_covered": 0, "domain_distribution": {},
+                        }})
+
+    if _cache["data"]:
+        return jsonify({"status": "done", **_cache["data"]})
+
+    return jsonify({"status": "idle"})
 
 
 @app.route("/api/download")

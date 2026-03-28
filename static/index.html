@@ -665,15 +665,53 @@ async function generate() {
   showLoading();
 
   try {
-    const resp = await fetch("/api/generate", { method: "POST" });
-    const data = await resp.json();
-    renderResults(data);
+    // Step 1: Start generation (returns immediately)
+    const startResp = await fetch("/api/generate", { method: "POST" });
+    const startData = await startResp.json();
+
+    if (startData.status === "started" || startData.status === "running") {
+      // Step 2: Poll for results
+      await pollForResults();
+    } else if (startData.articles) {
+      // Direct result (from cache)
+      renderResults(startData);
+    }
   } catch (err) {
     alert("生成失败，请重试: " + err.message);
   } finally {
     hideLoading();
     btn.disabled = false;
   }
+}
+
+async function pollForResults() {
+  const maxAttempts = 180; // max 6 minutes (180 * 2s)
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+
+    try {
+      const resp = await fetch("/api/status");
+      const data = await resp.json();
+
+      // Update loading text with server progress
+      if (data.progress) {
+        document.getElementById("loadingText").textContent = data.progress;
+      }
+
+      if (data.status === "done") {
+        renderResults(data);
+        return;
+      }
+      if (data.status === "error") {
+        alert("生成出错: " + (data.error || "未知错误"));
+        return;
+      }
+      // status === "running" -> keep polling
+    } catch (e) {
+      // Network error, keep trying
+    }
+  }
+  alert("生成超时，请重试");
 }
 
 const DOMAIN_COLORS = {
