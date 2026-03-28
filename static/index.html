@@ -670,6 +670,8 @@ async function generate() {
     const startData = await startResp.json();
 
     if (startData.status === "started" || startData.status === "running") {
+      // Stop static message cycling, use server progress instead
+      if (msgTimer) { clearInterval(msgTimer); msgTimer = null; }
       // Step 2: Poll for results
       await pollForResults();
     } else if (startData.articles) {
@@ -696,6 +698,8 @@ async function pollForResults() {
       // Update loading text with server progress
       if (data.progress) {
         document.getElementById("loadingText").textContent = data.progress;
+        document.getElementById("loadingSub").textContent =
+          "PROCESSING... " + Math.floor(i * 2) + "s";
       }
 
       if (data.status === "done") {

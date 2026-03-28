@@ -414,8 +414,9 @@ def _scrape_mp_api():
     accounts_with_fid = [a for a in TARGET_ACCOUNTS if a in FAKEID_MAP]
     accounts_without_fid = [a for a in TARGET_ACCOUNTS if a not in FAKEID_MAP]
 
-    for account in accounts_with_fid:
+    for idx, account in enumerate(accounts_with_fid):
         fakeid = FAKEID_MAP[account]
+        _task["progress"] = f"正在抓取 {account}...（{idx+1}/{len(accounts_with_fid)}）"
         print(f"[MP API] {account}: using cached fakeid")
 
         result = _fetch_articles_for_fakeid(account, fakeid, headers, cutoff)
