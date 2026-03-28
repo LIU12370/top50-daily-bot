@@ -387,8 +387,8 @@ def _fetch_articles_for_fakeid(account, fakeid, headers, cutoff):
             print(f"[MP API] parse error '{account}': {e}")
             break
 
-        # 每页间隔 5-10 秒
-        time.sleep(random.uniform(5, 10))
+        # 每页间隔 2-4 秒
+        time.sleep(random.uniform(2, 4))
 
     return articles
 
@@ -396,10 +396,9 @@ def _fetch_articles_for_fakeid(account, fakeid, headers, cutoff):
 def _scrape_mp_api():
     """
     完整 MP 后台抓取流程：
-    1. 遍历 TARGET_ACCOUNTS
-    2. 已有 fakeid 的直接用；没有的自动通过 searchbiz 查询
-    3. 拿到 fakeid 后立刻抓文章
-    4. 每处理完一个账号，随机休眠 15-30 秒
+    1. 优先处理有 fakeid 的账号（快速）
+    2. 没有 fakeid 的通过 searchbiz 查询（较慢，有风控）
+    3. 账号间间隔 3-5 秒（已有 fakeid）或 8-12 秒（需 searchbiz）
     """
     if not WECHAT_COOKIES or not WECHAT_TOKEN:
         print("[MP API] skipped: WECHAT_COOKIES or WECHAT_TOKEN not configured")
@@ -409,40 +408,16 @@ def _scrape_mp_api():
     now = datetime.now()
     cutoff = now - timedelta(hours=48)
     headers = _mp_headers()
-    searched_count = 0  # 本次运行通过 searchbiz 查询的次数
+    searched_count = 0
 
-    for account in TARGET_ACCOUNTS:
-        # ── Step 1: 获取 fakeid ──
-        fakeid = FAKEID_MAP.get(account)
+    # 先处理有 fakeid 的账号（速度快，间隔短）
+    accounts_with_fid = [a for a in TARGET_ACCOUNTS if a in FAKEID_MAP]
+    accounts_without_fid = [a for a in TARGET_ACCOUNTS if a not in FAKEID_MAP]
 
-        if fakeid:
-            print(f"[MP API] {account}: using cached fakeid")
-        else:
-            # 自动查询
-            print(f"[MP API] {account}: searching fakeid via searchbiz...")
-            result = _get_fakeid(account, headers)
+    for account in accounts_with_fid:
+        fakeid = FAKEID_MAP[account]
+        print(f"[MP API] {account}: using cached fakeid")
 
-            if result == "rate_limited":
-                print("[MP API] searchbiz rate limited, returning collected data")
-                return articles
-            if result == "expired":
-                print("[MP API] credentials expired, returning collected data")
-                return articles
-            if not result:
-                print(f"[MP API] {account}: fakeid not found, skipping")
-                # searchbiz 也需要间隔，即使失败
-                time.sleep(random.uniform(8, 15))
-                continue
-
-            fakeid = result
-            # 缓存到内存，同一次运行内不重复查
-            FAKEID_MAP[account] = fakeid
-            searched_count += 1
-
-            # searchbiz 后额外等待，因为搜索接口风控更严
-            time.sleep(random.uniform(8, 15))
-
-        # ── Step 2: 抓取文章 ──
         result = _fetch_articles_for_fakeid(account, fakeid, headers, cutoff)
 
         if result == "rate_limited":
@@ -455,8 +430,47 @@ def _scrape_mp_api():
         if isinstance(result, list):
             articles.extend(result)
 
-        # ── Step 3: 账号间大间隔 15-30 秒 ──
-        sleep_time = random.uniform(15, 30)
+        # 已有 fakeid 的账号间隔短一些
+        sleep_time = random.uniform(3, 5)
+        print(f"[MP API] sleeping {sleep_time:.0f}s before next account...")
+        time.sleep(sleep_time)
+
+    # 再处理需要 searchbiz 的账号
+    for account in accounts_without_fid:
+        print(f"[MP API] {account}: searching fakeid via searchbiz...")
+        result = _get_fakeid(account, headers)
+
+        if result == "rate_limited":
+            print("[MP API] searchbiz rate limited, returning collected data")
+            return articles
+        if result == "expired":
+            print("[MP API] credentials expired, returning collected data")
+            return articles
+        if not result:
+            print(f"[MP API] {account}: fakeid not found, skipping")
+            time.sleep(random.uniform(5, 8))
+            continue
+
+        fakeid = result
+        FAKEID_MAP[account] = fakeid
+        searched_count += 1
+
+        # searchbiz 后等一下再抓文章
+        time.sleep(random.uniform(5, 8))
+
+        result = _fetch_articles_for_fakeid(account, fakeid, headers, cutoff)
+
+        if result == "rate_limited":
+            print("[MP API] appmsg rate limited, returning collected data")
+            return articles
+        if result == "expired":
+            print("[MP API] credentials expired, returning collected data")
+            return articles
+
+        if isinstance(result, list):
+            articles.extend(result)
+
+        sleep_time = random.uniform(8, 12)
         print(f"[MP API] sleeping {sleep_time:.0f}s before next account...")
         time.sleep(sleep_time)
 
@@ -1113,11 +1127,20 @@ def api_generate():
     if _cache["data"] and _cache["time"] and (now - _cache["time"] < CACHE_TTL):
         return jsonify(_cache["data"])
 
-    data = generate_top50()
-    _cache["data"] = data
-    _cache["time"] = now
-    _cache["excel"] = build_excel(data)
-    return jsonify(data)
+    try:
+        data = generate_top50()
+        _cache["data"] = data
+        _cache["time"] = now
+        _cache["excel"] = build_excel(data)
+        return jsonify(data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e), "articles": [], "stats": {
+            "total_scraped": 0, "keyword_count": 0, "top50_count": 0,
+            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "accounts_covered": 0, "domain_distribution": {},
+        }}), 500
 
 
 @app.route("/api/download")
