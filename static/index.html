@@ -477,6 +477,74 @@ body::before {
   white-space: nowrap;
 }
 
+/* ── Keywords Panel ── */
+.keywords-panel {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem 2.5rem 0;
+}
+
+.keywords-inner {
+  background: var(--cream);
+  border: 1px solid var(--border);
+  padding: 1rem 1.2rem;
+}
+
+.keywords-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.keywords-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.kw-domain-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.kw-domain-label {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 2px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  min-width: 42px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.kw-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.kw-tag {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  color: var(--ink);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .keywords-panel { padding: 0.8rem 1rem 0; }
+}
+
 .total-score {
   color: var(--navy);
   font-size: 0.95rem;
@@ -599,6 +667,17 @@ body::before {
           <span>刷新</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Hot Keywords Panel -->
+  <div class="keywords-panel" id="keywordsPanel" style="display:none;">
+    <div class="keywords-inner">
+      <div class="keywords-header">
+        <span style="font-family:'Noto Serif SC',serif;font-weight:700;font-size:0.95rem;color:var(--navy);">今日热搜词</span>
+        <span style="font-size:0.72rem;color:var(--slate);font-family:'JetBrains Mono',monospace;" id="matchedInfo"></span>
+      </div>
+      <div id="keywordsList" class="keywords-list"></div>
     </div>
   </div>
 
@@ -748,6 +827,28 @@ function renderResults(data) {
       </span>`;
     }
     distEl.innerHTML = html;
+  }
+
+  // Hot Keywords Panel
+  const kwPanel = document.getElementById("keywordsPanel");
+  const kwList = document.getElementById("keywordsList");
+  if (data.hot_keywords && kwPanel && kwList) {
+    kwPanel.style.display = "block";
+    let kwHtml = "";
+    for (const [domain, keywords] of Object.entries(data.hot_keywords)) {
+      if (!keywords || keywords.length === 0) continue;
+      const color = DOMAIN_COLORS[domain] || "#666";
+      kwHtml += `<div class="kw-domain-row">
+        <span class="kw-domain-label" style="background:${color}">${esc(domain)}</span>
+        <div class="kw-tags">${keywords.map(k => `<span class="kw-tag">${esc(k)}</span>`).join("")}</div>
+      </div>`;
+    }
+    kwList.innerHTML = kwHtml;
+    // Show matched info
+    const matchedInfo = document.getElementById("matchedInfo");
+    if (matchedInfo && data.stats.matched_count !== undefined) {
+      matchedInfo.textContent = `${data.stats.matched_count}/${data.stats.top50_count} 篇匹配热搜`;
+    }
   }
 
   // Table

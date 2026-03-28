@@ -1023,28 +1023,35 @@ def generate_top50():
     verified = [art for art in articles if verify_article_source(art)]
     print(f"[Pipeline] Verified: {len(verified)} / {len(articles)} articles")
 
-    # Step 6: Domain-balanced selection (每领域 ~10 篇，总计 50)
+    # Step 6: Select TOP50
     _task["progress"] = "生成排行榜..."
-    per_domain = 10
-    domain_buckets = {d: [] for d in DOMAIN_NAMES}
-    for art in verified:
-        domain_buckets[art["domain"]].append(art)
 
-    # 每个桶内按总分排序
-    for d in DOMAIN_NAMES:
-        domain_buckets[d].sort(key=lambda x: -x["total_score"])
+    # 分为有热搜匹配和无匹配两组
+    matched_articles = [a for a in verified if a["match_count"] > 0]
+    unmatched_articles = [a for a in verified if a["match_count"] == 0]
 
-    # 第一轮：每领域取 per_domain 篇
     top50 = []
-    for d in DOMAIN_NAMES:
-        top50.extend(domain_buckets[d][:per_domain])
 
-    # 如果某领域不足 10 篇，用其他领域高分文章补齐
+    if matched_articles:
+        # 有匹配文章时：领域均衡选择
+        per_domain = 10
+        domain_buckets = {d: [] for d in DOMAIN_NAMES}
+        for art in matched_articles:
+            domain_buckets[art["domain"]].append(art)
+
+        for d in DOMAIN_NAMES:
+            domain_buckets[d].sort(key=lambda x: -x["total_score"])
+
+        for d in DOMAIN_NAMES:
+            top50.extend(domain_buckets[d][:per_domain])
+
+    # 不足50篇时，用无匹配的文章按"时间新 + 质量高"补齐
     if len(top50) < 50:
         used_titles = set(a["title"] for a in top50)
-        remaining = [a for a in verified if a["title"] not in used_titles]
-        remaining.sort(key=lambda x: -x["total_score"])
-        for art in remaining:
+        # 对无匹配文章按 (ai_score + time_weight) 排序（纯质量+时效）
+        fill_pool = [a for a in verified if a["title"] not in used_titles]
+        fill_pool.sort(key=lambda x: -(x["ai_score"] + x["time_weight"]))
+        for art in fill_pool:
             if len(top50) >= 50:
                 break
             top50.append(art)
@@ -1063,12 +1070,19 @@ def generate_top50():
     for art in top50:
         domain_dist[art["domain"]] = domain_dist.get(art["domain"], 0) + 1
 
+    # 构建热搜词展示列表（每领域取前5个）
+    hot_keywords_display = {}
+    for domain in DOMAIN_NAMES:
+        hot_keywords_display[domain] = domain_keywords.get(domain, [])[:8]
+
     return {
         "articles": top50,
+        "hot_keywords": hot_keywords_display,
         "stats": {
             "total_scraped": total_scraped,
             "keyword_count": kw_count,
             "top50_count": len(top50),
+            "matched_count": len([a for a in top50 if a["match_count"] > 0]),
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "accounts_covered": len(set(a["account"] for a in top50)),
             "domain_distribution": domain_dist,
