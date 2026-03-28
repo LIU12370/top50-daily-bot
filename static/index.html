@@ -352,9 +352,10 @@ body::before {
 }
 
 .data-table thead th:first-child { text-align: center; width: 50px; }
-.data-table thead th:nth-child(7),
+.data-table thead th:nth-child(2) { text-align: center; width: 70px; }
 .data-table thead th:nth-child(8),
-.data-table thead th:nth-child(9) { text-align: center; }
+.data-table thead th:nth-child(9),
+.data-table thead th:nth-child(10) { text-align: center; }
 
 .data-table tbody tr {
   transition: background 0.15s;
@@ -417,15 +418,8 @@ body::before {
   font-weight: 700;
   font-size: 0.92rem;
   line-height: 1.5;
-}
-
-.article-title a {
   color: var(--ink);
-  text-decoration: none;
-  transition: color 0.2s;
 }
-
-.article-title a:hover { color: var(--rust); }
 
 /* Summary */
 .article-summary {
@@ -465,6 +459,24 @@ body::before {
 .match-badge.high { background: var(--rust); }
 .match-badge.mid { background: var(--teal); }
 
+.domain-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.keyword-tag {
+  font-size: 0.78rem;
+  color: var(--navy);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .total-score {
   color: var(--navy);
   font-size: 0.95rem;
@@ -493,7 +505,7 @@ body::before {
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .table-wrap { padding: 1rem; overflow-x: auto; }
-  .data-table { min-width: 900px; }
+  .data-table { min-width: 1100px; }
   .stats-inner { padding: 0 1rem; }
   .masthead-inner { padding: 1.5rem 1rem 1.2rem; }
 }
@@ -576,6 +588,7 @@ body::before {
         </div>
         <span class="gen-time" id="genTime"></span>
       </div>
+      <div id="domainDist" style="display:flex;align-items:center;flex-wrap:wrap;"></div>
       <div class="stats-right">
         <button class="btn-download" onclick="downloadExcel()">
           <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
@@ -594,9 +607,11 @@ body::before {
       <thead>
         <tr>
           <th>#</th>
+          <th>领域</th>
           <th>公众号</th>
           <th>文章标题</th>
           <th>摘要</th>
+          <th>匹配热搜</th>
           <th>发布时间</th>
           <th>匹配词数</th>
           <th>AI评分</th>
@@ -608,7 +623,7 @@ body::before {
   </div>
 
   <div class="foot">
-    数据来源：微博热搜 · 22个头部微信公众号 &nbsp;|&nbsp; 评分算法：热点匹配 × 1.5 + AI评分 + 时效权重 &nbsp;|&nbsp; 每次点击实时生成
+    数据来源：微博热搜 · 22个头部微信公众号 &nbsp;|&nbsp; 评分算法：热点匹配 × 1.5 + AI评分 + 时效权重 &nbsp;|&nbsp; 五大领域均衡分配 &nbsp;|&nbsp; 每次点击实时生成
   </div>
 </section>
 
@@ -661,6 +676,14 @@ async function generate() {
   }
 }
 
+const DOMAIN_COLORS = {
+  "政治": "#B8432F",
+  "财经": "#C8A951",
+  "AI":   "#6C5CE7",
+  "科技": "#2A7B6E",
+  "军事": "#4A5568",
+};
+
 function renderResults(data) {
   document.getElementById("heroSection").style.display = "none";
   document.getElementById("results").classList.add("active");
@@ -670,6 +693,20 @@ function renderResults(data) {
   document.getElementById("statKeywords").textContent = data.stats.keyword_count;
   document.getElementById("statAccounts").textContent = data.stats.accounts_covered;
   document.getElementById("genTime").textContent = data.stats.generated_at;
+
+  // Domain distribution
+  const distEl = document.getElementById("domainDist");
+  if (distEl && data.stats.domain_distribution) {
+    let html = "";
+    for (const [d, cnt] of Object.entries(data.stats.domain_distribution)) {
+      const color = DOMAIN_COLORS[d] || "#666";
+      html += `<span style="display:inline-flex;align-items:center;gap:0.25rem;margin-right:0.8rem;">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;"></span>
+        <span style="font-size:0.75rem;color:var(--slate);">${esc(d)} ${cnt}</span>
+      </span>`;
+    }
+    distEl.innerHTML = html;
+  }
 
   // Table
   const tbody = document.getElementById("tableBody");
@@ -682,12 +719,15 @@ function renderResults(data) {
     tr.style.animationDelay = `${i * 0.03}s`;
 
     const matchClass = art.match_count >= 5 ? "high" : art.match_count >= 3 ? "mid" : "";
+    const domainColor = DOMAIN_COLORS[art.domain] || "#666";
 
     tr.innerHTML = `
       <td class="rank-cell">${rank}</td>
+      <td style="text-align:center;"><span class="domain-badge" style="background:${domainColor}">${esc(art.domain || "")}</span></td>
       <td class="account-name">${esc(art.account)}</td>
-      <td class="article-title"><a href="${esc(art.url)}" target="_blank" rel="noopener">${esc(art.title)}</a></td>
+      <td class="article-title">${esc(art.title)}</td>
       <td class="article-summary">${esc(art.summary)}</td>
+      <td class="keyword-tag">${esc(art.primary_keyword || "")}</td>
       <td class="pub-time">${esc(art.pub_time)}</td>
       <td class="score-cell"><span class="match-badge ${matchClass}">${art.match_count}</span></td>
       <td class="score-cell">${art.ai_score}</td>
