@@ -106,7 +106,7 @@ DOMAIN_NAMES = list(DOMAINS.keys())
 TARGET_ACCOUNTS = [
     "三联生活周刊", "视觉志", "网易上流", "闻旅", "新周刊",
     "三联生活实验室", "正解局", "混知", "九行", "地道风物",
-    "刺猬公社", "BT财经", "华尔街见闻", "腾讯科技", "砾石商业评论",
+    "刺猬公社", "BT财经", "华尔街见闻", "腾讯科技", "砺石商业评论",
     "功夫财经", "光子星球", "新智元", "量子位", "哈佛商业评论",
     "外滩TheBund", "新世界相"
 ]
@@ -129,6 +129,12 @@ FAKEID_MAP = {
     "刺猬公社": "MzkxNzAwMDkwNQ==",
     "BT财经": "MzA5OTg2NzA5Ng==",
     "华尔街见闻": "MjM5NzAwMzU0MA==",
+    "腾讯科技": "Mjc1NjM3MjY2MA==",
+    "功夫财经": "MzIzOTA3NTA5Mg==",
+    "光子星球": "MzA4MjUxODMwMg==",
+    "新智元": "MzI3MTA0MTk1MA==",
+    "量子位": "MzIzNjc1NzUzMw==",
+    "砺石商业评论": "MzIyMDMyNTMwMw==",
 }
 # 环境变量补充（JSON 格式，会合并到 FAKEID_MAP）
 _fakeid_env = os.environ.get("WECHAT_FAKEIDS", "{}")
