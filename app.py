@@ -108,7 +108,7 @@ TARGET_ACCOUNTS = [
     "三联生活实验室", "正解局", "混知", "九行", "地道风物",
     "刺猬公社", "BT财经", "华尔街见闻", "腾讯科技", "砺石商业评论",
     "功夫财经", "光子星球", "新智元", "量子位", "哈佛商业评论",
-    "外滩TheBund", "新世界相"
+    "外滩TheBund",
 ]
 
 HEADERS = {
@@ -135,6 +135,18 @@ FAKEID_MAP = {
     "新智元": "MzI3MTA0MTk1MA==",
     "量子位": "MzIzNjc1NzUzMw==",
     "砺石商业评论": "MzIyMDMyNTMwMw==",
+    "三联生活周刊": "MTc5MTU3NTYyMQ==",
+    "视觉志": "MjM5NTAyODc2MA==",
+    "网易上流": "MzAwNzM5MDA1MQ==",
+    "闻旅": "Mzg3MjAwMDUwNw==",
+    "新周刊": "MjM5ODMzMDMyMw==",
+    "三联生活实验室": "MzA4OTM1MTcyMA==",
+    "正解局": "MjM5MTU3Mzk2OA==",
+    "混知": "MjM5Mjg3MTIzMQ==",
+    "九行": "MzU4MzM0MjkxNw==",
+    "地道风物": "MzAxMjU2NzUyMA==",
+    "哈佛商业评论": "MjM5NzY4MzQyMQ==",
+    "外滩TheBund": "MzIyNTg5NTAxNA==",
 }
 # 环境变量补充（JSON 格式，会合并到 FAKEID_MAP）
 _fakeid_env = os.environ.get("WECHAT_FAKEIDS", "{}")
@@ -163,36 +175,67 @@ def _classify_keyword(keyword):
 
 def scrape_weibo_hot():
     """
-    抓取微博实时热搜，分类到五大领域。
+    抓取实时热搜，分类到五大领域。
+    优先微博，403时自动切换百度热搜。
     返回: {"政治": [...], "财经": [...], "AI": [...], "科技": [...], "军事": [...]}
-    每个领域的关键词列表，语义扩展后用于文章匹配。
     """
     raw_keywords = []
+
+    # 微博热搜
     try:
         url = "https://weibo.com/ajax/side/hotSearch"
         resp = requests.get(url, headers=HEADERS, timeout=10)
-        data = resp.json()
-        for item in data.get("data", {}).get("realtime", []):
-            word = item.get("word", "").strip()
-            if word and len(word) >= 2:
-                raw_keywords.append(word)
-        print(f"[Weibo API] fetched {len(raw_keywords)} live hot keywords")
+        if resp.status_code == 200:
+            data = resp.json()
+            for item in data.get("data", {}).get("realtime", []):
+                word = item.get("word", "").strip()
+                if word and len(word) >= 2:
+                    raw_keywords.append(word)
+            print(f"[Weibo API] fetched {len(raw_keywords)} live hot keywords")
+        else:
+            print(f"[Weibo API] status {resp.status_code}, trying Baidu...")
     except Exception as e:
         print(f"[Weibo API] error: {e}")
 
-    # 热搜词补充：热门话题 API
-    try:
-        url2 = "https://weibo.com/ajax/statuses/hot_band"
-        resp2 = requests.get(url2, headers=HEADERS, timeout=10)
-        data2 = resp2.json()
-        seen = set(k.lower() for k in raw_keywords)
-        for item in data2.get("data", {}).get("band_list", []):
-            word = item.get("word", "").strip()
-            if word and len(word) >= 2 and word.lower() not in seen:
-                raw_keywords.append(word)
-                seen.add(word.lower())
-    except Exception:
-        pass
+    # 微博补充
+    if len(raw_keywords) < 10:
+        try:
+            url2 = "https://weibo.com/ajax/statuses/hot_band"
+            resp2 = requests.get(url2, headers=HEADERS, timeout=10)
+            if resp2.status_code == 200:
+                data2 = resp2.json()
+                seen = set(k.lower() for k in raw_keywords)
+                for item in data2.get("data", {}).get("band_list", []):
+                    word = item.get("word", "").strip()
+                    if word and len(word) >= 2 and word.lower() not in seen:
+                        raw_keywords.append(word)
+                        seen.add(word.lower())
+        except Exception:
+            pass
+
+    # 百度热搜备用
+    if len(raw_keywords) < 10:
+        try:
+            baidu_url = "https://top.baidu.com/api/board?platform=wise&tab=realtime"
+            resp3 = requests.get(baidu_url, headers=HEADERS, timeout=10)
+            if resp3.status_code == 200:
+                data3 = resp3.json()
+                seen = set(k.lower() for k in raw_keywords)
+                cards = data3.get("data", {}).get("cards", [])
+                for card in cards:
+                    content = card.get("content", [])
+                    if isinstance(content, list):
+                        for c in content:
+                            if isinstance(c, dict) and "content" in c:
+                                for item in c["content"]:
+                                    word = item.get("word", "") or item.get("query", "")
+                                    word = word.strip()
+                                    if word and len(word) >= 2 and word.lower() not in seen:
+                                        raw_keywords.append(word)
+                                        seen.add(word.lower())
+                print(f"[Baidu Hot] fetched {len(raw_keywords)} total keywords")
+        except Exception as e:
+            print(f"[Baidu Hot] error: {e}")
 
     # 分类到五大领域
     domain_keywords = {d: [] for d in DOMAIN_NAMES}
@@ -325,7 +368,7 @@ def _fetch_articles_for_fakeid(account, fakeid, headers, cutoff):
     now = datetime.now()
     api_url = "https://mp.weixin.qq.com/cgi-bin/appmsg"
 
-    for page in range(2):
+    for page in range(1):  # 只抓1页5篇，72h内够用
         params = {
             "action": "list_ex",
             "begin": page * 5,
@@ -387,8 +430,8 @@ def _fetch_articles_for_fakeid(account, fakeid, headers, cutoff):
             print(f"[MP API] parse error '{account}': {e}")
             break
 
-        # 每页间隔 2-4 秒
-        time.sleep(random.uniform(2, 4))
+        # 每页间隔 1-1.5 秒
+        time.sleep(random.uniform(1, 1.5))
 
     return articles
 
@@ -432,8 +475,8 @@ def _scrape_mp_api():
             articles.extend(result)
 
         # 已有 fakeid 的账号间隔短一些
-        sleep_time = random.uniform(3, 5)
-        print(f"[MP API] sleeping {sleep_time:.0f}s before next account...")
+        sleep_time = random.uniform(1, 2)
+        print(f"[MP API] sleeping {sleep_time:.1f}s before next account...")
         time.sleep(sleep_time)
 
     # 再处理需要 searchbiz 的账号
@@ -449,7 +492,7 @@ def _scrape_mp_api():
             return articles
         if not result:
             print(f"[MP API] {account}: fakeid not found, skipping")
-            time.sleep(random.uniform(5, 8))
+            time.sleep(random.uniform(2, 3))
             continue
 
         fakeid = result
@@ -457,7 +500,7 @@ def _scrape_mp_api():
         searched_count += 1
 
         # searchbiz 后等一下再抓文章
-        time.sleep(random.uniform(5, 8))
+        time.sleep(random.uniform(2, 3))
 
         result = _fetch_articles_for_fakeid(account, fakeid, headers, cutoff)
 
@@ -471,8 +514,8 @@ def _scrape_mp_api():
         if isinstance(result, list):
             articles.extend(result)
 
-        sleep_time = random.uniform(8, 12)
-        print(f"[MP API] sleeping {sleep_time:.0f}s before next account...")
+        sleep_time = random.uniform(3, 5)
+        print(f"[MP API] sleeping {sleep_time:.1f}s before next account...")
         time.sleep(sleep_time)
 
     print(f"[MP API] done: {len(articles)} articles | "
@@ -811,44 +854,8 @@ def search_articles_bulk():
         print(f"[Pipeline] MP API error: {e}")
     print(f"[Pipeline] After MP API: {len(all_articles)} articles")
 
-    # Source 1: Sogou WeChat search for each target account
-    print("[Pipeline] Searching Sogou for target accounts...")
-    for acc in TARGET_ACCOUNTS:
-        try:
-            results = search_articles_for_account(acc)
-            add_unique(results)
-            time.sleep(0.5)
-        except Exception:
-            pass
-
-    print(f"[Pipeline] After Sogou: {len(all_articles)} articles")
-
-    # Source 2: TopHub aggregator
-    print("[Pipeline] Scraping TopHub...")
-    try:
-        tophub_results = _scrape_tophub()
-        add_unique(tophub_results)
-    except Exception:
-        pass
-    print(f"[Pipeline] After TopHub: {len(all_articles)} articles")
-
-    # Source 3: 36kr and Huxiu
-    print("[Pipeline] Scraping aggregator sites...")
-    try:
-        agg_results = _scrape_aggregator_sites()
-        add_unique(agg_results)
-    except Exception:
-        pass
-    print(f"[Pipeline] After aggregators: {len(all_articles)} articles")
-
-    # Source 4: Known public websites
-    print("[Pipeline] Scraping known sites...")
-    try:
-        site_results = _scrape_known_sites()
-        add_unique(site_results)
-    except Exception:
-        pass
-    print(f"[Pipeline] After known sites: {len(all_articles)} articles")
+    # 备用源已禁用：Sogou/TopHub/36kr/Huxiu/known sites
+    # MP API 已覆盖所有21个目标公众号，备用源不产出有效新文章且浪费 60-80 秒
 
     # STRICT 72-hour freshness filter
     filtered = []
